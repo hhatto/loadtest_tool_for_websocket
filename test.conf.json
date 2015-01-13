@@ -1,0 +1,8 @@
+{
+    "url": "ws://localhost:9000/",
+    "roomPerInstance": 20,
+    "userPerRoom": 10,
+    "loops": 2000,
+    "interval": 20,
+    "keep": 300
+}

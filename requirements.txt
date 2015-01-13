@@ -1,0 +1,6 @@
+msgpack-python
+tornado
+autobahntestsuite
+websocket-client
+humanize
+psutil
