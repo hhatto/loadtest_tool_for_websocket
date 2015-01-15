@@ -13,8 +13,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/gorilla/websocket"
-	//"github.com/vmihailenco/msgpack"
-    "gopkg.in/vmihailenco/msgpack.v2"
+	"gopkg.in/vmihailenco/msgpack.v2"
 )
 
 type Config struct {
@@ -27,6 +26,16 @@ type Config struct {
 	BattleID        int
 }
 
+type TAT struct {
+	Target    string // client address "ip:port"
+	MsgNum    int
+	isStart   bool
+	StartTime time.Time
+	Sum       float64
+	Min       float64
+	Max       float64
+}
+
 type StressTestInfo struct {
 	StartTime       time.Time
 	AllSendByteSize int
@@ -35,6 +44,7 @@ type StressTestInfo struct {
 	ConnExecTimeMin float64
 	ConnExecTimeMax float64
 	ConnectionNum   int
+	MessageTAT      TAT
 	Config          *Config
 }
 
@@ -47,6 +57,12 @@ func (st *StressTestInfo) send(ws *websocket.Conn, msg []map[string]interface{})
 	if err = ws.WriteMessage(websocket.BinaryMessage, packedMsg); err != nil {
 		log.Printf("write message: %v", err)
 		return err
+	}
+
+	if st.MessageTAT.Target == ws.LocalAddr().String() {
+		st.MessageTAT.isStart = true
+		st.MessageTAT.MsgNum += 1
+		st.MessageTAT.StartTime = time.Now()
 	}
 
 	st.AllSendByteSize += len(packedMsg)
@@ -66,6 +82,11 @@ func (st *StressTestInfo) execScenarioTest() (err error) {
 			log.Printf("new client: %v", err)
 			break
 		}
+		// for TAT
+		if i == 0 {
+			st.MessageTAT.Target = ws.LocalAddr().String()
+		}
+
 		endTime := time.Now()
 		diffTime := endTime.Sub(startTime).Seconds()
 		st.ConnExecTimeSum += diffTime
@@ -79,7 +100,7 @@ func (st *StressTestInfo) execScenarioTest() (err error) {
 		// count up ws connection
 		st.ConnectionNum += 1
 
-		go st.PingPong(ws)
+		go st.RecvWithPingPong(ws)
 		go st.execScenario(ws)
 
 		time.Sleep(time.Duration(st.Config.Interval) * time.Millisecond)
@@ -105,11 +126,11 @@ func (st *StressTestInfo) execScenario(ws *websocket.Conn) {
 		msg = append(msg, _data)
 		st.send(ws, msg)
 
-		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
+		time.Sleep(time.Duration(rand.Intn(7)+3) * time.Second)
 	}
 }
 
-func (st *StressTestInfo) PingPong(ws *websocket.Conn) (err error) {
+func (st *StressTestInfo) RecvWithPingPong(ws *websocket.Conn) (err error) {
 	for {
 		msgType, r, err := ws.NextReader()
 		if err != nil {
@@ -128,6 +149,18 @@ func (st *StressTestInfo) PingPong(ws *websocket.Conn) (err error) {
 			break
 		}
 		st.AllRecvByteSize += len(buf)
+
+		if st.MessageTAT.isStart && st.MessageTAT.Target == ws.LocalAddr().String() {
+			st.MessageTAT.isStart = false
+			diffTime := time.Now().Sub(st.MessageTAT.StartTime).Seconds()
+			st.MessageTAT.Sum += diffTime
+			if st.MessageTAT.Min > diffTime {
+				st.MessageTAT.Min = diffTime
+			}
+			if st.MessageTAT.Max < diffTime {
+				st.MessageTAT.Max = diffTime
+			}
+		}
 	}
 
 	return nil
@@ -149,6 +182,9 @@ func (st *StressTestInfo) dumpInfo() {
 		fmt.Printf("Connect Time(avg): %.1f [ms]\n", st.ConnExecTimeSum/float64(st.ConnectionNum)*1000.)
 		fmt.Printf("Connect Time(min): %.1f [ms]\n", st.ConnExecTimeMin*1000.)
 		fmt.Printf("Connect Time(max): %.1f [ms]\n", st.ConnExecTimeMax*1000.)
+		fmt.Printf("Message TAT (avg): %.1f [ms]\n", st.MessageTAT.Sum/float64(st.MessageTAT.MsgNum)*1000.)
+		fmt.Printf("Message TAT (min): %.1f [ms]\n", st.MessageTAT.Min*1000.)
+		fmt.Printf("Message TAT (max): %.1f [ms]\n", st.MessageTAT.Max*1000.)
 	}
 }
 
@@ -174,7 +210,7 @@ func main() {
 
 	st.Config = config
 	st.ConnExecTimeMin = 999999.9
-
+	st.MessageTAT.Min = 999999.9
 	st.StartTime = time.Now()
 	go st.dumpInfo()
 
