@@ -1,5 +1,3 @@
-import time
-import json
 import msgpack
 from tornado.ioloop import IOLoop
 from tornado.ioloop import PeriodicCallback
@@ -19,8 +17,8 @@ class EchoBinaryMessageWebSocket(WebSocketHandler):
         self.ping("ping")
 
     def on_message(self, msg):
-        message = msgpack.unpackb(msg)
-        packed_msg = msgpack.packb({'b': 'Hello'})
+        unpack_data = msgpack.unpackb(msg)
+        packed_msg = msgpack.packb(unpack_data)
         self.write_message(packed_msg, binary=True)
 
     def on_close(self):
