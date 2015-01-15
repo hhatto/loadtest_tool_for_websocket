@@ -1,7 +1,10 @@
 import argparse
 import json
 import os
+import time
 import psutil
+
+CPU_INTERVAL = 5.0
 
 
 def _humanize_bytes(num):
@@ -15,7 +18,7 @@ def get_stats(pid=os.getpid()):
     proc = psutil.Process(pid)
     mem = proc.get_memory_info()
     fds = proc.get_num_fds()
-    cpu = proc.cpu_percent()
+    cpu = proc.cpu_percent(interval=CPU_INTERVAL)
     conns = proc.get_connections()
     net_established = len([c for c in conns if c.status == 'ESTABLISHED'])
     net_listen = len([c for c in conns if c.status == 'LISTEN'])
@@ -40,4 +43,5 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--pid', dest='pid', help='pid')
     args = parser.parse_args()
     pid = args.pid
+    print("wait %dsec" % CPU_INTERVAL)
     print(get_stats(int(pid)))
