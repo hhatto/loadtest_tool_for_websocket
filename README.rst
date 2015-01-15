@@ -11,7 +11,7 @@ Client
 
 Server
 ------
-* Tornado + WebSocket + msgpack
+* Tornado + msgpack
 
 
 Performance
