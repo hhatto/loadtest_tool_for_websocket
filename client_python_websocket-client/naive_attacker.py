@@ -27,9 +27,30 @@ def connect(url):
 def send_recv(ws):
     global websocket_connections, testinfo
     packed_data = msgpack.packb([{'a': 1}, ])
-    websocket_connections[ws].send(packed_data, websocket.ABNF.OPCODE_BINARY)  # send with binary mode
-    testinfo['AllSendByteSize'] += len(packed_data)
-    testinfo['AllRecvByteSize'] += len(websocket_connections[ws].recv())
+    start = datetime.now()
+    # send with binary mode
+    websocket_connections[ws].send(packed_data, websocket.ABNF.OPCODE_BINARY)
+    send_data_size = len(packed_data)
+    recv_data_size = 0
+    msg_num = 0
+    while True:
+        opcode, frame = websocket_connections[ws].recv_data_frame(True)
+        if opcode == websocket.ABNF.OPCODE_PING:
+            websocket_connections[ws].pong("")
+            # print(ws, "pong")
+        elif opcode == websocket.ABNF.OPCODE_BINARY:
+            # print(ws, "data")
+            recv_data_size += len(frame.data)
+            msg_num += 1
+            end = datetime.now()
+            break
+        else:
+            # not support opcode in this tool
+            # print(ws, "not support opcode:", opcode)
+            break
+    tat = end - start
+    # print("s: %d, r: %d" % (send_data_size, recv_data_size))
+    return send_data_size, recv_data_size, tat.microseconds / 1000., msg_num
 
 
 def dump_info(pid, info_queue):
@@ -43,27 +64,40 @@ def dump_info(pid, info_queue):
         if end is True:
             break
         testinfo.update(end)
-        now =  datetime.now()
-        print("======= %s (elapsed: %s)" % (now, now - testinfo['StartTime']))
-        print("tool's pid: %d" % pid)
-        print("target url: %s" % testinfo['TargetURL'])
-        print("Send Byte Size   : %s [byte] (%s)" % (
-            humanize.intcomma(testinfo['AllSendByteSize']), humanize.naturalsize(testinfo['AllSendByteSize'])))
-        print("Recive Byte Size : %s [byte] (%s)" % (
-            humanize.intcomma(testinfo['AllRecvByteSize']), humanize.naturalsize(testinfo['AllRecvByteSize'])))
-        print("Connection       : %d [conn]" % testinfo['ConnectionNum'])
-        print("Connect Time(avg): %.1f [ms]" % (testinfo['ConnExecTimeSum']/testinfo['ConnectionNum']))
-        print("Connect Time(min): %.1f [ms]" % testinfo['ConnExecTimeMin'])
-        print("Connect Time(max): %.1f [ms]" % testinfo['ConnExecTimeMax'])
+        now = datetime.now()
+        try:
+            print("======= %s (elapsed: %s)" % (now, now - testinfo['StartTime']))
+            print("tool's pid: %d" % pid)
+            print("target url: %s" % testinfo['TargetURL'])
+            print("Send Byte Size   : %s [byte] (%s)" % (
+                humanize.intcomma(testinfo['AllSendByteSize']),
+                humanize.naturalsize(testinfo['AllSendByteSize'])))
+            print("Recive Byte Size : %s [byte] (%s)" % (
+                humanize.intcomma(testinfo['AllRecvByteSize']),
+                humanize.naturalsize(testinfo['AllRecvByteSize'])))
+            print("Connection       : %d [conn]" % testinfo['ConnectionNum'])
+            print("Connect Time(avg): %.1f [ms]" % (
+                testinfo['ConnExecTimeSum']/testinfo['ConnectionNum']))
+            print("Connect Time(min): %.1f [ms]" % testinfo['ConnExecTimeMin'])
+            print("Connect Time(max): %.1f [ms]" % testinfo['ConnExecTimeMax'])
+            print("Message TAT (avg): %.1f [ms]" % (
+                testinfo['MsgTATSum']/testinfo['MsgNum']))
+            print("Message TAT (min): %.1f [ms]" % testinfo['MsgTATMin'])
+            print("Message TAT (max): %.1f [ms]" % testinfo['MsgTATMax'])
+        except ZeroDivisionError:
+            pass
 
 
-def _exec(ws_pool_len, end_queue):
-    pool = Pool(10)
+def _exec(ws_pool_len, end_queue, datasize_queue):
+    pool = Pool(2)
     while True:
-        a = pool.map(send_recv, range(ws_pool_len))
+        ret = pool.map(send_recv, range(ws_pool_len))
+        t = [sum([d[0] for d in ret]), sum([d[1] for d in ret]),
+             [d[2] for d in ret], sum([d[3] for d in ret])]
+        datasize_queue.put(t)
         end = False
         try:
-            end = end_queue.get(timeout=random.randint(1, 10))
+            end = end_queue.get(timeout=random.randint(3, 10))
         except Empty:
             pass
         if end:
@@ -72,10 +106,10 @@ def _exec(ws_pool_len, end_queue):
 
 def main():
     global websocket_connections, testinfo
-    # FIXME: unable multi-process
     pid = os.getpid()
-    que = Queue()
+    end_queue = Queue()
     info_queue = Queue()
+    datasize_queue = Queue()
     test_start = datetime.now()
     parser = argparse.ArgumentParser(description='stress test tool for websocket servers')
     parser.add_argument('--config', dest='config_file', required=True, help='config file')
@@ -90,11 +124,11 @@ def main():
         'ConnExecTimeSum': 0,
         'ConnExecTimeMin': 9999999999,
         'ConnExecTimeMax': 0,
+        'MsgNum': 0,
+        'MsgTATSum': 0,
+        'MsgTATMin': 9999999999,
+        'MsgTATMax': 0,
     }
-
-    # test info proc
-    infoproc = Process(target=dump_info, args=(pid, info_queue, ))
-    infoproc.start()
 
     # connect websocket
     for cnt in range(conf['loops']):
@@ -111,25 +145,44 @@ def main():
                 testinfo['ConnExecTimeMin'] = diff
             if testinfo['ConnExecTimeMax'] < diff:
                 testinfo['ConnExecTimeMax'] = diff
-            time.sleep(conf['interval'] / 1000.)
+        else:
+            print("connection error")
+        time.sleep(conf['interval'] / 1000.)
+
+    # test info proc
+    infoproc = Process(target=dump_info, args=(pid, info_queue, ))
+    infoproc.start()
 
     # test execution
     ws_pool_len = len(websocket_connections)
-    testproc = Process(target=_exec, args=(ws_pool_len, que))
+    testproc = Process(target=_exec, args=(ws_pool_len, end_queue, datasize_queue))
     testproc.start()
     print("keep %dsec" % (conf['keep']))
-    num = 0
+    old_diff = datetime.now() - test_start
     while True:
-        if (num % 10) == 1:
-            info_queue.put(testinfo)
         diff = datetime.now() - test_start
+        if (diff.seconds % 10) == 0 and old_diff.seconds != diff.seconds:
+            info_queue.put(testinfo)
         if diff.seconds >= conf['keep']:
             break
-        num += 1
-        time.sleep(1)
+        old_diff = diff
+        try:
+            s, r, tat_list, msg_num = datasize_queue.get(timeout=1)
+        except Empty:
+            continue
+        testinfo['AllSendByteSize'] += s
+        testinfo['AllRecvByteSize'] += r
+        testinfo['MsgNum'] += msg_num
+        testinfo['MsgTATSum'] += sum(tat_list)
+        m = min(tat_list)
+        if testinfo['MsgTATMin'] > m:
+            testinfo['MsgTATMin'] = m
+        m = max(tat_list)
+        if testinfo['MsgTATMax'] < m:
+            testinfo['MsgTATMax'] = m
 
     # enqueue for proc end & wait proc
-    que.put(True)
+    end_queue.put(True)
     info_queue.put(True)
     testproc.join()
     infoproc.join()
