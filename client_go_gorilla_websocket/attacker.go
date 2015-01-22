@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"runtime"
 	"sync/atomic"
 	"time"
 
@@ -191,6 +192,10 @@ func main() {
 	flag.StringVar(&conf, "config", "", "config file path")
 
 	flag.Parse()
+
+	if runtime.GOMAXPROCS(2) > 1 {
+		log.Println("not change GOMAXPROCS")
+	}
 
 	// for stress test
 	st := new(StressTestInfo)
