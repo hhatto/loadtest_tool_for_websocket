@@ -30,11 +30,11 @@ power management:
 
 ### memory
 ```
-$ free                                                                                                                                                (git)-[master]
+$ free
              total       used       free     shared    buffers     cached
-             Mem:       5981148    2759304    3221844          0     395272    1064292
-             -/+ buffers/cache:    1299740    4681408
-             Swap:      6127612          0    6127612
+Mem:       5981148    2545964    3435184          0     260224    1159768
+-/+ buffers/cache:    1125972    4855176
+Swap:      6127612     380896    5746716
 ```
 
 ### versions
