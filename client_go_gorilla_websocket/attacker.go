@@ -17,13 +17,10 @@ import (
 )
 
 type Config struct {
-	URL             string
-	RoomPerInstance int
-	UserPerRoom     int
-	Loops           int
-	Interval        int // msec
-	Keep            int // sec
-	BattleID        int
+	URL      string
+	Loops    int
+	Interval int // msec
+	Keep     int // sec
 }
 
 type TAT struct {
