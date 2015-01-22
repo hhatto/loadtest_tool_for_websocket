@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/dustin/go-humanize"
@@ -25,18 +26,18 @@ type Config struct {
 
 type RTT struct {
 	Target    string // client address "ip:port"
-	MsgNum    int
+	MsgNum    int32
 	isStart   bool
 	StartTime time.Time
-	Sum       float64
+	Sum       int64
 	Min       float64
 	Max       float64
 }
 
 type StressTestInfo struct {
 	StartTime       time.Time
-	AllSendByteSize int
-	AllRecvByteSize int
+	AllSendByteSize int64
+	AllRecvByteSize int64
 	ConnExecTimeSum float64 // for avarage time
 	ConnExecTimeMin float64
 	ConnExecTimeMax float64
@@ -58,11 +59,11 @@ func (st *StressTestInfo) send(ws *websocket.Conn, msg []map[string]interface{})
 
 	if st.MessageRTT.Target == ws.LocalAddr().String() {
 		st.MessageRTT.isStart = true
-		st.MessageRTT.MsgNum += 1
+		atomic.AddInt32(&st.MessageRTT.MsgNum, 1)
 		st.MessageRTT.StartTime = time.Now()
 	}
 
-	st.AllSendByteSize += len(packedMsg)
+	atomic.AddInt64(&st.AllSendByteSize, int64(len(packedMsg)))
 	return err
 }
 
@@ -145,12 +146,12 @@ func (st *StressTestInfo) RecvWithPingPong(ws *websocket.Conn) (err error) {
 			ws.Close()
 			break
 		}
-		st.AllRecvByteSize += len(buf)
+		atomic.AddInt64(&st.AllRecvByteSize, int64(len(buf)))
 
 		if st.MessageRTT.isStart && st.MessageRTT.Target == ws.LocalAddr().String() {
 			st.MessageRTT.isStart = false
 			diffTime := time.Now().Sub(st.MessageRTT.StartTime).Seconds()
-			st.MessageRTT.Sum += diffTime
+			atomic.AddInt64(&st.MessageRTT.Sum, int64(diffTime*1000))
 			if st.MessageRTT.Min > diffTime {
 				st.MessageRTT.Min = diffTime
 			}
@@ -174,12 +175,12 @@ func (st *StressTestInfo) dumpInfo() {
 		fmt.Printf("Send Byte Size   : %s [byte] (%s)\n",
 			humanize.Comma(int64(st.AllSendByteSize)), humanize.Bytes(uint64(st.AllSendByteSize)))
 		fmt.Printf("Recive Byte Size : %s [byte] (%s)\n",
-			humanize.Comma(int64(st.AllRecvByteSize)), humanize.Bytes(uint64(st.AllRecvByteSize)))
+			humanize.Comma(st.AllRecvByteSize), humanize.Bytes(uint64(st.AllRecvByteSize)))
 		fmt.Printf("Connection       : %d [conn]\n", st.ConnectionNum)
 		fmt.Printf("Connect Time(avg): %.1f [ms]\n", st.ConnExecTimeSum/float64(st.ConnectionNum)*1000.)
 		fmt.Printf("Connect Time(min): %.1f [ms]\n", st.ConnExecTimeMin*1000.)
 		fmt.Printf("Connect Time(max): %.1f [ms]\n", st.ConnExecTimeMax*1000.)
-		fmt.Printf("Message RTT (avg): %.1f [ms]\n", st.MessageRTT.Sum/float64(st.MessageRTT.MsgNum)*1000.)
+		fmt.Printf("Message RTT (avg): %.1f [ms]\n", float64(st.MessageRTT.Sum)/float64(st.MessageRTT.MsgNum))
 		fmt.Printf("Message RTT (min): %.1f [ms]\n", st.MessageRTT.Min*1000.)
 		fmt.Printf("Message RTT (max): %.1f [ms]\n", st.MessageRTT.Max*1000.)
 	}
