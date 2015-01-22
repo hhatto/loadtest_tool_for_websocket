@@ -16,4 +16,6 @@ Server
 
 Performance
 ===========
-todo...
+see `result/result.md`_
+
+.. _`result/result.md`: https://github.com/hhatto/loadtest_tool_for_websoket/blob/master/result/result.md
