@@ -23,7 +23,7 @@ type Config struct {
 	Keep     int // sec
 }
 
-type TAT struct {
+type RTT struct {
 	Target    string // client address "ip:port"
 	MsgNum    int
 	isStart   bool
@@ -41,7 +41,7 @@ type StressTestInfo struct {
 	ConnExecTimeMin float64
 	ConnExecTimeMax float64
 	ConnectionNum   int
-	MessageTAT      TAT
+	MessageRTT      RTT
 	Config          *Config
 }
 
@@ -56,10 +56,10 @@ func (st *StressTestInfo) send(ws *websocket.Conn, msg []map[string]interface{})
 		return err
 	}
 
-	if st.MessageTAT.Target == ws.LocalAddr().String() {
-		st.MessageTAT.isStart = true
-		st.MessageTAT.MsgNum += 1
-		st.MessageTAT.StartTime = time.Now()
+	if st.MessageRTT.Target == ws.LocalAddr().String() {
+		st.MessageRTT.isStart = true
+		st.MessageRTT.MsgNum += 1
+		st.MessageRTT.StartTime = time.Now()
 	}
 
 	st.AllSendByteSize += len(packedMsg)
@@ -79,9 +79,9 @@ func (st *StressTestInfo) execScenarioTest() (err error) {
 			log.Printf("new client: %v", err)
 			break
 		}
-		// for TAT
+		// for RTT
 		if i == 0 {
-			st.MessageTAT.Target = ws.LocalAddr().String()
+			st.MessageRTT.Target = ws.LocalAddr().String()
 		}
 
 		endTime := time.Now()
@@ -147,15 +147,15 @@ func (st *StressTestInfo) RecvWithPingPong(ws *websocket.Conn) (err error) {
 		}
 		st.AllRecvByteSize += len(buf)
 
-		if st.MessageTAT.isStart && st.MessageTAT.Target == ws.LocalAddr().String() {
-			st.MessageTAT.isStart = false
-			diffTime := time.Now().Sub(st.MessageTAT.StartTime).Seconds()
-			st.MessageTAT.Sum += diffTime
-			if st.MessageTAT.Min > diffTime {
-				st.MessageTAT.Min = diffTime
+		if st.MessageRTT.isStart && st.MessageRTT.Target == ws.LocalAddr().String() {
+			st.MessageRTT.isStart = false
+			diffTime := time.Now().Sub(st.MessageRTT.StartTime).Seconds()
+			st.MessageRTT.Sum += diffTime
+			if st.MessageRTT.Min > diffTime {
+				st.MessageRTT.Min = diffTime
 			}
-			if st.MessageTAT.Max < diffTime {
-				st.MessageTAT.Max = diffTime
+			if st.MessageRTT.Max < diffTime {
+				st.MessageRTT.Max = diffTime
 			}
 		}
 	}
@@ -179,9 +179,9 @@ func (st *StressTestInfo) dumpInfo() {
 		fmt.Printf("Connect Time(avg): %.1f [ms]\n", st.ConnExecTimeSum/float64(st.ConnectionNum)*1000.)
 		fmt.Printf("Connect Time(min): %.1f [ms]\n", st.ConnExecTimeMin*1000.)
 		fmt.Printf("Connect Time(max): %.1f [ms]\n", st.ConnExecTimeMax*1000.)
-		fmt.Printf("Message TAT (avg): %.1f [ms]\n", st.MessageTAT.Sum/float64(st.MessageTAT.MsgNum)*1000.)
-		fmt.Printf("Message TAT (min): %.1f [ms]\n", st.MessageTAT.Min*1000.)
-		fmt.Printf("Message TAT (max): %.1f [ms]\n", st.MessageTAT.Max*1000.)
+		fmt.Printf("Message RTT (avg): %.1f [ms]\n", st.MessageRTT.Sum/float64(st.MessageRTT.MsgNum)*1000.)
+		fmt.Printf("Message RTT (min): %.1f [ms]\n", st.MessageRTT.Min*1000.)
+		fmt.Printf("Message RTT (max): %.1f [ms]\n", st.MessageRTT.Max*1000.)
 	}
 }
 
@@ -207,7 +207,7 @@ func main() {
 
 	st.Config = config
 	st.ConnExecTimeMin = 999999.9
-	st.MessageTAT.Min = 999999.9
+	st.MessageRTT.Min = 999999.9
 	st.StartTime = time.Now()
 	go st.dumpInfo()
 

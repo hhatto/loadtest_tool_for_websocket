@@ -48,9 +48,9 @@ def send_recv(ws):
             # not support opcode in this tool
             # print(ws, "not support opcode:", opcode)
             break
-    tat = end - start
+    rtt = end - start
     # print("s: %d, r: %d" % (send_data_size, recv_data_size))
-    return send_data_size, recv_data_size, tat.microseconds / 1000., msg_num
+    return send_data_size, recv_data_size, rtt.microseconds / 1000., msg_num
 
 
 def dump_info(pid, info_queue):
@@ -80,10 +80,10 @@ def dump_info(pid, info_queue):
                 testinfo['ConnExecTimeSum']/testinfo['ConnectionNum']))
             print("Connect Time(min): %.1f [ms]" % testinfo['ConnExecTimeMin'])
             print("Connect Time(max): %.1f [ms]" % testinfo['ConnExecTimeMax'])
-            print("Message TAT (avg): %.1f [ms]" % (
-                testinfo['MsgTATSum']/testinfo['MsgNum']))
-            print("Message TAT (min): %.1f [ms]" % testinfo['MsgTATMin'])
-            print("Message TAT (max): %.1f [ms]" % testinfo['MsgTATMax'])
+            print("Message RTT (avg): %.1f [ms]" % (
+                testinfo['MsgRTTSum']/testinfo['MsgNum']))
+            print("Message RTT (min): %.1f [ms]" % testinfo['MsgRTTMin'])
+            print("Message RTT (max): %.1f [ms]" % testinfo['MsgRTTMax'])
         except ZeroDivisionError:
             pass
 
@@ -125,9 +125,9 @@ def main():
         'ConnExecTimeMin': 9999999999,
         'ConnExecTimeMax': 0,
         'MsgNum': 0,
-        'MsgTATSum': 0,
-        'MsgTATMin': 9999999999,
-        'MsgTATMax': 0,
+        'MsgRTTSum': 0,
+        'MsgRTTMin': 9999999999,
+        'MsgRTTMax': 0,
     }
 
     # connect websocket
@@ -167,19 +167,19 @@ def main():
             break
         old_diff = diff
         try:
-            s, r, tat_list, msg_num = datasize_queue.get(timeout=1)
+            s, r, rtt_list, msg_num = datasize_queue.get(timeout=1)
         except Empty:
             continue
         testinfo['AllSendByteSize'] += s
         testinfo['AllRecvByteSize'] += r
         testinfo['MsgNum'] += msg_num
-        testinfo['MsgTATSum'] += sum(tat_list)
-        m = min(tat_list)
-        if testinfo['MsgTATMin'] > m:
-            testinfo['MsgTATMin'] = m
-        m = max(tat_list)
-        if testinfo['MsgTATMax'] < m:
-            testinfo['MsgTATMax'] = m
+        testinfo['MsgRTTSum'] += sum(rtt_list)
+        m = min(rtt_list)
+        if testinfo['MsgRTTMin'] > m:
+            testinfo['MsgRTTMin'] = m
+        m = max(rtt_list)
+        if testinfo['MsgRTTMax'] < m:
+            testinfo['MsgRTTMax'] = m
 
     # enqueue for proc end & wait proc
     end_queue.put(True)
