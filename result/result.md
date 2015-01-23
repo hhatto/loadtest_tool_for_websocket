@@ -38,7 +38,7 @@ Swap:      6127612     380896    5746716
 ```
 
 ### versions
-* Ptyhon2.7.8
+* Python2.7.8
 * Go1.4
 
 
