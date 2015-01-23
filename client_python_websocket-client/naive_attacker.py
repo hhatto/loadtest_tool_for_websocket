@@ -110,7 +110,6 @@ def main():
     end_queue = Queue()
     info_queue = Queue()
     datasize_queue = Queue()
-    test_start = datetime.now()
     parser = argparse.ArgumentParser(description='stress test tool for websocket servers')
     parser.add_argument('--config', dest='config_file', required=True, help='config file')
     optargs = parser.parse_args()
@@ -148,6 +147,8 @@ def main():
         else:
             print("connection error")
         time.sleep(conf['interval'] / 1000.)
+
+    test_start = datetime.now()
 
     # test info proc
     infoproc = Process(target=dump_info, args=(pid, info_queue, ))
