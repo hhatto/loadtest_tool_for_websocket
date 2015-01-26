@@ -1,4 +1,4 @@
-## Machine
+## Machine Spec
 ### cpu
 ```
 $ cat /proc/cpuinfo     # 8core
