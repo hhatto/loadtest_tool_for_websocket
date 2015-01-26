@@ -45,9 +45,7 @@ def run():
     if not rtt_info['TargetID']:
         rtt_info['TargetID'] = id(ws)
 
-    time.sleep(conf['interval'] / 1000.)
-
-    testinfo['StartTime'] = datetime.now()
+    connect_end_time = datetime.now()
     diff = end - start
     diff = diff.microseconds / 1000.    # msec
     testinfo['ConnectionNum'] += 1
@@ -56,6 +54,9 @@ def run():
         testinfo['ConnExecTimeMin'] = diff
     if testinfo['ConnExecTimeMax'] < diff:
         testinfo['ConnExecTimeMax'] = diff
+
+    if testinfo['ConnectionNum'] >= conf['loops']:
+        print("keep %d sec" % conf['keep'])
 
     def send_msg():
         packed_data = msgpack.packb([{'a': 1}, ])
@@ -84,7 +85,7 @@ def run():
                 rtt_info['Min'] = _tmp
             if rtt_info['Max'] < _tmp:
                 rtt_info['Max'] = _tmp
-        diff = end - testinfo['StartTime']
+        diff = end - connect_end_time
         if diff.seconds > conf['keep']:
             break
     IOLoop.instance().stop()
@@ -128,10 +129,10 @@ def main():
     optargs = parser.parse_args()
     conf = json.load(open(optargs.config_file))
 
+    testinfo['StartTime'] = datetime.now()
     testinfo['TargetURL'] = conf['url'] + 'ws'
-    for cnt in range(conf['loops']):
-        IOLoop.instance().add_callback(run)
-    print("keep %dsec" % conf['keep'])
+    for offset, cnt in enumerate(range(conf['loops'])):
+        IOLoop.instance().call_later(offset * conf['interval'] / 1000., run)
 
     info_task = PeriodicCallback(wrap_dump_info, 10 * 1000)
     info_task.start()
