@@ -55,8 +55,10 @@ def run():
     if testinfo['ConnExecTimeMax'] < diff:
         testinfo['ConnExecTimeMax'] = diff
 
+    is_maxcon = False
     if testinfo['ConnectionNum'] >= conf['loops']:
         print("keep %d sec" % conf['keep'])
+        is_maxcon = True
 
     def send_msg():
         packed_data = msgpack.packb([{'a': 1}, ])
@@ -86,7 +88,7 @@ def run():
             if rtt_info['Max'] < _tmp:
                 rtt_info['Max'] = _tmp
         diff = end - connect_end_time
-        if diff.seconds > conf['keep']:
+        if diff.seconds > conf['keep'] and is_maxcon:
             break
     IOLoop.instance().stop()
 
