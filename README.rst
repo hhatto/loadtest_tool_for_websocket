@@ -7,6 +7,7 @@ Client
 ------
 * Go + gollira/websocket
 * Python + websocket-client
+* Python + Tornado
 
 
 Server
