@@ -91,3 +91,23 @@ Message RTT (avg): 1.3 [ms]
 Message RTT (min): 0.3 [ms]
 Message RTT (max): 168.5 [ms]
 ```
+
+### Python (Tornado)
+```
+{"mem.vss_human": "362.8 MB", "fds": 4102, "net.established": 4096, "net.time_wait": 0, "mem.vss": 380407808, "net.listen": 0, "mem.rss_human": "159.0 MB", "pid": 4158, "cpu": 93.3, "mem.rss": 166735872}
+
+jenkins   4158 80.1  2.7 371492 162828 pts/1   R+   20:59   2:19 python attacker.py --config ../test.conf.json
+
+======= 2015-01-26 21:06:11.051949 (elapsed: 0:06:20.144718)
+tool's pid: 4158
+target url: ws://localhost:9000/ws
+Send Byte Size   : 2,273,915 [byte] (2.3 MB)
+Recive Byte Size : 2,273,830 [byte] (2.3 MB)
+Connection       : 4096 [conn]
+Connect Time(avg): 6.0 [ms]
+Connect Time(min): 1.1 [ms]
+Connect Time(max): 410.0 [ms]
+Message RTT (avg): 16.5 [ms]
+Message RTT (min): 0.1 [ms]
+Message RTT (max): 326.7 [ms]
+```
