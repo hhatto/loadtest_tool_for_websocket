@@ -5,7 +5,7 @@ Load Test Tool for WebSocket
 
 Client
 ------
-* Go + gollira/websocket
+* Go + gorilla/websocket
 * Python + websocket-client
 * Python + Tornado
 
