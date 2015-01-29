@@ -3,7 +3,6 @@ import json
 import os
 import random
 import threading
-import time
 from datetime import datetime
 import humanize
 import msgpack
@@ -11,7 +10,6 @@ from tornado import gen
 from tornado.ioloop import PeriodicCallback, IOLoop
 from tornado.websocket import websocket_connect
 
-Sem = threading.Semaphore()
 rtt_info = {
     'TargetID': None,
     'MsgNum': 0,
