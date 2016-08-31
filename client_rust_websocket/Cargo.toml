@@ -1,0 +1,11 @@
+[package]
+name = "client_rust_websocket"
+version = "0.1.0"
+authors = ["Hideo Hattori <hattori-h@klab.com>"]
+
+[dependencies]
+websocket = "0.17.1"
+rustc-serialize = "0.3"
+rmp = "^0.7"
+rmp-serialize = "^0.7"
+time = "0.1"
