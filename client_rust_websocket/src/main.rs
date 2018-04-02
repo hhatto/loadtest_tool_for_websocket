@@ -17,6 +17,7 @@ use websocket::receiver as wreceiver;
 use rustc_serialize::Encodable;
 use msgpack::Encoder;
 
+#[derive(Debug)]
 struct RTT {
     target: String,
     msg_num: i32,
@@ -41,7 +42,7 @@ struct StressTestInfo {
 
 fn sendloop(mut sender: wsender::Sender<WebSocketStream>,
             rx: mpsc::Receiver<Message>,
-            rtt: Arc<Mutex<RTT>>) {
+            rtt_tx: mpsc::Sender<RTT>) {
     loop {
         let mut h = HashMap::new();
         h.insert("a", 1);
@@ -70,7 +71,7 @@ fn sendloop(mut sender: wsender::Sender<WebSocketStream>,
             Ok(m) => {
                 match m.opcode {
                     Type::Pong => {
-                        sender.send_message(&m);
+                        let _ = sender.send_message(&m);
                         //println!("send PONG: {:?}", m);
                     }
                     _ => {
@@ -86,7 +87,8 @@ fn sendloop(mut sender: wsender::Sender<WebSocketStream>,
 }
 
 fn recvloop(mut receiver: wreceiver::Receiver<WebSocketStream>,
-            tx: mpsc::Sender<Message>) {
+            tx: mpsc::Sender<Message>,
+            rtt_tx: mpsc::Sender<RTT>) {
     for msg in receiver.incoming_messages() {
         let msg: Message = match msg {
             Ok(m) => m,
@@ -134,11 +136,18 @@ fn main() {
     let rtt = Arc::new(Mutex::new(RTT::new()));
     let (sender, receiver) = res.begin().split();
     let (tx, rx) = mpsc::channel();
+    let (rtt_tx, rtt_rx) = mpsc::channel();
 
-    let send_loop = thread::spawn(move || sendloop(sender, rx, rtt.clone()));
-    let recv_loop = thread::spawn(move || recvloop(receiver, tx));
+    let rtt_tx_c = rtt_tx.clone();
+    let send_loop = thread::spawn(move || sendloop(sender, rx, rtt_tx_c));
+    let recv_loop = thread::spawn(move || recvloop(receiver, tx, rtt_tx.clone()));
     handles.push(send_loop);
     handles.push(recv_loop);
+
+    thread::spawn(move || {
+        let r = rtt_rx.recv().unwrap();
+        println!("r={:?}", r);
+    });
 
     for handle in handles {
         handle.join().unwrap();
